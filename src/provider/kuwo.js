@@ -16,6 +16,50 @@ const format = (song) => ({
 	})),
 });
 
+const generateSign = (str) => {
+  const currentTime = Date.now();
+  str += `&timestamp=${currentTime}`;
+  const questionMarkIndex = str.indexOf('?');
+  const baseUrl = str.substring(0, questionMarkIndex);
+  const filteredChars = str
+    .substring(questionMarkIndex + 1)
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .split('');
+  filteredChars.sort();
+  const dataToEncrypt = `kuwotest${filteredChars.join('')}${url.parse(baseUrl).path}`;
+  const md5 = crypto.createHash('md5').update(dataToEncrypt).digest('hex');
+  return `${str}&sign=${md5.toLowerCase()}`;
+};
+
+const sendAdFreeRequest = async () => {
+  const adurl =
+    'http://bd-api.kuwo.cn/api/service/advert/watch?uid=-1&token=&timestamp=1724306124436&sign=15a676d66285117ad714e8c8371691da';
+  const headers = {
+    'user-agent': 'Dart/2.19 (dart:io)',
+    plat: 'ar',
+    channel: 'aliopen',
+    devid: '114514114514',
+    ver: '3.9.0',
+    host: 'bd-api.kuwo.cn',
+    qimei36: '1e9970cbcdc20a031dee9f37100017e1840e',
+    'content-type': 'application/json; charset=utf-8',
+  };
+  const data = JSON.stringify({
+    type: 5,
+    subType: 5,
+    musicId: 0,
+    adToken: '',
+  });
+
+  const response = await request('POST', adurl, {
+    headers,
+    body: data,
+  });
+  if (typeof response.body === 'object') {
+    console.log('bodian ad free response:', response.body);
+  }
+};
+
 const search = (info) => {
 	// const keyword = encodeURIComponent(info.keyword.replace(' - ', ' '));
 	// const url = `http://www.kuwo.cn/api/www/search/searchMusicBykeyWord?key=${keyword}&pn=1&rn=30`;
@@ -59,28 +103,36 @@ const search = (info) => {
 		});
 };
 
-const track = (id) => {
-	const url = crypto.kuwoapi
-		? 'http://mobi.kuwo.cn/mobi.s?f=kuwo&q=' +
-			crypto.kuwoapi.encryptQuery(
-				'corp=kuwo&source=kwplayerautolite_ar_1.0.0.21_C_APK_guanwang_lite.apk&p2p=1&type=convert_url2&sig=0&format=' +
-					['flac', 'mp3']
-						.slice(select.ENABLE_FLAC ? 0 : 1)
-						.join('|') +
-					'&rid=' +
-					id
-			)
-		: 'http://antiserver.kuwo.cn/anti.s?type=convert_url&format=mp3&response=url&rid=MUSIC_' +
-			id; // flac refuse
-	// : 'http://www.kuwo.cn/url?format=mp3&response=url&type=convert_url3&br=320kmp3&rid=' + id // flac refuse
-
-	return request('GET', url, { 'user-agent': 'okhttp/3.10.0' })
-		.then((response) => response.body())
-		.then((body) => {
-			const url = (body.match(/http[^\s$"]+/) || [])[0];
-			return url || Promise.reject();
-		})
-		.catch(() => insure().kuwo.track(id));
+const track = async (id) => {
+  const headers = {
+    'user-agent': 'Dart/2.19 (dart:io)',
+    plat: 'ar',
+    channel: 'aliopen',
+    devid: '114514114514',
+    ver: '3.9.0',
+    host: 'bd-api.kuwo.cn',
+    'X-Forwarded-For': '1.0.1.114',
+  };
+  let audioUrl = `http://bd-api.kuwo.cn/api/play/music/v2/audioUrl?&br=${[
+    '2000kflac',
+    '320kmp3',
+  ]
+    .slice(select.ENABLE_FLAC ? 0 : 1)
+    .join('|')}&musicId=${id}`;
+  audioUrl = generateSign(audioUrl);
+  try {
+    let response = await request('GET', audioUrl, { headers });
+    if (response.statusCode !== 200) {
+      await sendAdFreeRequest();
+      response = await request('GET', audioUrl, { headers });
+      if (response.statusCode !== 200) insure().kuwo.track(id);
+    }
+    const body = await response.body();
+    const urlMatch = (body.match(/http[^\s$"]+/) || [])[0];
+    return urlMatch || insure().kuwo.track(id);
+  } catch (error) {
+    return insure().kuwo.track(id);
+  }
 };
 
 const cs = getManagedCacheStorage('provider/kuwo');
