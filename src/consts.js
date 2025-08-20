@@ -2,6 +2,7 @@ const DEFAULT_SOURCE = ['kugou', 'kuwo', 'migu', 'bilibili', 'ytdlp'];
 const PROVIDERS = {
 	qq: require('./provider/qq'),
 	kugou: require('./provider/kugou'),
+	bodian: require('./provider/kuwo'),
 	kuwo: require('./provider/kuwo'),
 	migu: require('./provider/migu'),
 	joox: require('./provider/joox'),
