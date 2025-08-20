@@ -3,6 +3,7 @@ const select = require('./select');
 const crypto = require('../crypto');
 const request = require('../request');
 const { getManagedCacheStorage } = require('../cache');
+const url = require('url');
 
 const format = (song) => ({
 	id: song.MUSICRID.split('_').pop(),
